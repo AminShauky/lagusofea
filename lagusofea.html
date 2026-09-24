@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mau Dibawa Kemana Dust</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #050505;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #d4d4d4;
+        }
+
+        #canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #startContainer {
+            position: relative;
+            z-index: 10;
+            font-family: Arial, sans-serif;
+            font-size: 1.2rem;
+            cursor: pointer;
+            letter-spacing: 2px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            transition: opacity 1s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="laguBackground">
+        <source src="armada.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="startContainer">Klik skrin untuk kumpulkan debu...</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        let w = canvas.width = window.innerWidth;
+        let h = canvas.height = window.innerHeight;
+        
+        // Data lirik diselarikan dengan masa lagu (dalam saat)
+        const lyricsData = [
+            { start: 8.0, end: 12.0, text: "Semuanya telah kuberi" },
+            { start: 13.0, end: 16.0, text: "Dengan kesungguhan hati" },
+            { start: 16.5, end: 24.0, text: "Untukmu hanya untukmu" },
+            { start: 26.5, end: 30.0, text: "Tak perlu kau tanya lagi" },
+            { start: 30.5, end: 33.5, text: "Siapa pemilik hati ini" },
+            { start: 34.0, end: 42.0, text: "Kau tahu pasti dirimu" },
+            { start: 42.5, end: 46.5, text: "Tolong lihat aku" },
+            { start: 47.0, end: 50.5, text: "Dan jawab pertanyaanku" },
+            { start: 50.0, end: 57.0, text: "Mau dibawa kemana hubungan kita" },
+            { start: 58.0, end: 64.0, text: "Jika kau terus menunda nunda" },
+            { start: 64.5, end: 67.5, text: "Dan tak pernah nyatakan cinta" },
+            { start: 68.0, end: 77.0, text: "Mau dibawa kemana hubungan kita" },
+            { start: 77.0, end: 81.0, text: "Ku tak akan terus jalani" },
+            { start: 81.0, end: 91.0, text: "Tanpa ada ikatan pasti antara kau dan aku" },
+            { start: 95.0, end: 100.0, text: "Tak perlu kau tanya lagi" },
+            { start: 100.0, end: 104.0, text: "Siapa pemilik hati ini" },
+            { start: 104.0, end: 113.0, text: "Kau tahu pasti dirimu" },
+            { start: 113.0, end: 117.0, text: "Tolong lihat aku" },
+            { start: 117.0, end: 121.0, text: "Dan jawab pertanyaanku" },
+            { start: 120.5, end: 128.0, text: "Mau dibawa kemana hubungan kita" },
+            { start: 128.5, end: 134.0, text: "Jika kau terus menunda nunda" },
+            { start: 134.0, end: 138.0, text: "Dan tak pernah nyatakan cinta" },
+            { start: 138.0, end: 146.0, text: "Mau dibawa kemana hubungan kita" },
+            { start: 146.0, end: 151.0, text: "Ku tak akan terus jalani" },
+            { start: 151.5, end: 164.0, text: "Tanpa ada ikatan pasti antara kau dan aku" },
+            { start: 174.0, end: 178.0, text: "Tolong lihat aku" },
+            { start: 178.5, end: 181.0, text: "Dan jawab pertanyaanku" },
+            { start: 181.0, end: 190.0, text: "Mau dibawa kemana hubungan kita" },
+            { start: 190.5, end: 196.0, text: "Jika kau terus menunda nunda" },
+            { start: 196.0, end: 200.0, text: "Dan tak pernah nyatakan cinta" },
+            { start: 200.0, end: 208.0, text: "Mau dibawa kemana hubungan kita" },
+            { start: 208.0, end: 212.0, text: "Ku tak akan terus jalani" },
+            { start: 212.5, end: 228.0, text: "Tanpa ada ikatan pasti antara kau dan aku" }
+            // Tambah baki lirik kat bawah ni. Letak masa start dan end.
+        ];
+        
+        let particles = [];
+        let particleCount = 3200; 
+        let isScattered = true;
+        let activeLyricIndex = -1; // Jejaki lirik mana yang tengah aktif
+        
+        class Particle {
+            constructor() {
+                this.x = Math.random() * w;
+                this.y = Math.random() * h;
+                this.size = Math.random() * 1.8 + 1;
+                this.vx = (Math.random() * 3) - 1.5;
+                this.vy = (Math.random() * 3) - 1.5;
+                this.targetX = undefined;
+                this.targetY = undefined;
+                this.ease = 0.12 + Math.random() * 0.08; 
+                this.isActive = false; 
+            }
+            
+            update() {
+                if (!isScattered && this.isActive && this.targetX !== undefined) {
+                    let dx = this.targetX - this.x;
+                    let dy = this.targetY - this.y;
+                    this.x += dx * this.ease;
+                    this.y += dy * this.ease;
+                } else {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    if (this.x < 0 || this.x > w) this.vx *= -1;
+                    if (this.y < 0 || this.y > h) this.vy *= -1;
+                }
+            }
+            
+            draw() {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.shadowBlur = 3;
+                ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        for(let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+        
+        function getCoordinates(text) {
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+            offCanvas.width = w;
+            offCanvas.height = h;
+            
+            offCtx.fillStyle = 'white';
+            
+            let fontSize = 90; 
+            offCtx.font = `900 ${fontSize}px "Arial Black", Impact, sans-serif`;
+            let textWidth = offCtx.measureText(text).width;
+            
+            if(textWidth > w * 0.9) {
+                fontSize = Math.floor((w * 0.9 / textWidth) * fontSize);
+            }
+            
+            if (fontSize < 20) fontSize = 20;
+            
+            offCtx.font = `900 ${fontSize}px "Arial Black", Impact, sans-serif`;
+            offCtx.textAlign = 'center';
+            offCtx.textBaseline = 'middle';
+            offCtx.fillText(text, w/2, h/2);
+            
+            const data = offCtx.getImageData(0, 0, w, h).data;
+            const coords = [];
+            
+            for(let y = 0; y < h; y += 2) {
+                for(let x = 0; x < w; x += 2) {
+                    let index = (y * w + x) * 4;
+                    if (data[index + 3] > 128) {
+                        coords.push({x: x, y: y});
+                    }
+                }
+            }
+            return coords;
+        }
+        
+        function formLyric(text) {
+            const coords = getCoordinates(text);
+            coords.sort(() => Math.random() - 0.5); 
+            
+            for(let i = 0; i < particles.length; i++) {
+                if (i < coords.length) {
+                    particles[i].targetX = coords[i].x;
+                    particles[i].targetY = coords[i].y;
+                    particles[i].isActive = true;
+                } else {
+                    particles[i].isActive = false;
+                }
+            }
+            isScattered = false;
+        }
+
+        function scatterParticles() {
+            if (isScattered) return; 
+            isScattered = true;
+            particles.forEach(p => {
+                if (p.isActive) {
+                    p.vx = (Math.random() * 24) - 12;
+                    p.vy = (Math.random() * 24) - 12;
+                }
+            });
+        }
+        
+        const audio = document.getElementById('laguBackground');
+
+        function animate() {
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.25)';
+            ctx.fillRect(0, 0, w, h);
+            
+            // Logik periksa masa lagu sebenar
+            let time = audio.currentTime;
+            let found = false;
+            
+            for (let i = 0; i < lyricsData.length; i++) {
+                if (time >= lyricsData[i].start && time <= lyricsData[i].end) {
+                    if (activeLyricIndex !== i) {
+                        activeLyricIndex = i;
+                        formLyric(lyricsData[i].text);
+                    }
+                    found = true;
+                    break;
+                }
+            }
+            
+            // Jika lagu tak berada dalam masa lirik yang disenaraikan, sepahkan debu
+            if (!found && activeLyricIndex !== -1) {
+                scatterParticles();
+                activeLyricIndex = -1;
+            }
+            
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animate);
+        }
+        
+        window.addEventListener('resize', () => {
+            w = canvas.width = window.innerWidth;
+            h = canvas.height = window.innerHeight;
+        });
+
+        const startContainer = document.getElementById('startContainer');
+        let started = false;
+
+        document.body.addEventListener('click', () => {
+            if(!started) {
+                started = true;
+                startContainer.style.opacity = '0'; 
+                setTimeout(() => startContainer.style.display = 'none', 1000);
+                
+                audio.play();
+                animate(); 
+            }
+        });
+    </script>
+</body>
+</html>
